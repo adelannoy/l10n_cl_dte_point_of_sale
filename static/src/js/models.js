@@ -109,7 +109,7 @@ models.load_models({
 });
 
 models.load_models({
-	model: 'res.country.state.city',
+	model: 'res.city',
 	fields: ['id', 'name', 'state_id'],
 		loaded: function(self, ct){
 			self.cities = ct;
@@ -169,7 +169,7 @@ models.PosModel = models.PosModel.extend({
 		return sii_document_number;
 	},
 	push_order: function(order, opts) {
-		if(order && order.es_boleta()){
+		if(order && order.es_boleta() && !this.finalized){
 			var orden_numero = order.orden_numero -1;
 			var caf_files = JSON.parse(order.sequence_id.caf_files);
 			var start_number = order.sequence_id.sii_document_class_id.sii_code == 41 ? this.pos_session.start_number_exentas : this.pos_session.start_number;
@@ -198,12 +198,15 @@ models.Order = models.Order.extend({
 			this.set_boleta(true);
 			this.set_tipo_boleta(this.pos.config.secuencia_boleta_exenta);
 		}else if (this.pos.config.marcar === 'factura'){
-			this.is_to_invoice(true);
+			this.set_to_invoice(true);
 		}
 		if(this.es_boleta()){
 			this.signature = this.signature || false;
 			this.sii_document_number = this.sii_document_number || false;
 			this.orden_numero = this.orden_numero || this.pos.pos_session.numero_ordenes;
+			if (this.orden_numero <= 0){
+				this.orden_numero = 1;
+			}
 		}
 	},
 	export_as_JSON: function() {
@@ -212,6 +215,7 @@ models.Order = models.Order.extend({
 		json.sii_document_number = this.sii_document_number;
 		json.signature = this.signature;
 		json.orden_numero = this.orden_numero;
+		json.finalized = this.finalized;
 		return json;
 	},
     init_from_JSON: function(json) {// carga pedido individual
@@ -220,6 +224,8 @@ models.Order = models.Order.extend({
     	this.sii_document_number = json.sii_document_number;
     	this.signature = json.signature;
     	this.orden_numero = json.orden_numero;
+			this.finalized = json.finalized;
+			console.log(json);
 	},
 	export_for_printing: function() {
 		var json = _super_order.export_for_printing.apply(this,arguments);
@@ -254,7 +260,7 @@ models.Order = models.Order.extend({
 	},
 	initialize_validation_date: function(){
 		_super_order.initialize_validation_date.apply(this,arguments);
-		if (!this.is_to_invoice() && this.es_boleta()){
+		if (!this.is_to_invoice() && this.es_boleta() && !this.finalized){
 			if(this.es_boleta_exenta()){
 				this.pos.pos_session.numero_ordenes_exentas ++;
 				this.orden_numero = this.pos.pos_session.numero_ordenes_exentas;
@@ -262,13 +268,14 @@ models.Order = models.Order.extend({
 				this.pos.pos_session.numero_ordenes ++;
 				this.orden_numero = this.pos.pos_session.numero_ordenes;
 			}
+			this.finalized = true;
 		}
 	},
-    get_total_with_tax: function() {
-    	_super_order.get_total_with_tax.apply(this,arguments);
-    	return round_pr(this.orderlines.reduce((function(sum, orderLine) {
-    		return sum + orderLine.get_price_with_tax();
-    	}), 0), this.pos.currency.rounding);
+  get_total_with_tax: function() {
+  	_super_order.get_total_with_tax.apply(this,arguments);
+  	return round_pr(this.orderlines.reduce((function(sum, orderLine) {
+  		return sum + orderLine.get_price_with_tax();
+  	}), 0), this.pos.currency.rounding);
 	},
 	set_tipo_boleta: function(tipo_boleta){
 		this.sequence_id = tipo_boleta;
@@ -364,8 +371,10 @@ models.Order = models.Order.extend({
 		var partner_id = this.get_client();
 		if(!partner_id){
 			partner_id = {};
-			partner_id.document_number = "66666666-6";
 			partner_id.name = "Usuario Anonimo";
+		}
+		if(!partner_id.document_number){
+			partner_id.document_number = "66666666-6";
 		}
 		var product_name = false;
 		var ols = order.orderlines.models;
