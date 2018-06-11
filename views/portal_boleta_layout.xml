@@ -76,17 +76,6 @@
 								type="date" name="date_invoice" required="" placeholder="yyyy-mm-dd" />
 						</div>
 					</div>
-					<div class="col-xs-12">
-						<div class="col-xs-5">
-							<strong class="pull-left">Total:</strong>
-							<span class="fa fa-usd"></span>
-						</div>
-						<!--<div class="col-xs-7">
-							<input class="form-control pull-right" style="display: inline-block; width: 100%;"
-								type="number" name="amount_total" required="" />
-						</div>
-					-->
-					</div>
 					<div class="mt16 text-center col-xs-12" name="boleta_filter">
 						<button class="btn btn-primary btn-lg fa fa-search">Consultar Boleta</button>
 					</div>
