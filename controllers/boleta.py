@@ -15,32 +15,40 @@ class Boleta(http.Controller):
             return request.render('l10n_cl_dte_point_of_sale.boleta_layout')
         return request.redirect('/boleta/%s?%s' % (post['boleta'], urllib.parse.urlencode(post)))
 
-    @http.route(['/boleta/<int:folio>'], type='http', auth="public", website=True)
-    def view_document(self, folio=None, **post):
-        if 'otra_boleta' in post:
-            return request.redirect('/boleta/%s' %(post['otra_boleta']))
-        Model = request.env['pos.order'].sudo()
+    def _get_domain_pos_order(self, folio, post_values):
         domain = [('sii_document_number', '=', int(folio))]
         #if post.get('date_invoice', ''):
         #    domain.append(('date_order','=',post.get('date_invoice', '')))
         #if post.get('amount_total', ''):
         #    domain.append(('amount_total','=',float(post.get('amount_total', ''))))
-        if post.get('sii_codigo', ''):
-            domain.append(('document_class_id.sii_code','=',int(post.get('sii_codigo', ''))))
+        if post_values.get('sii_codigo', ''):
+            domain.append(('document_class_id.sii_code', '=', int(post_values.get('sii_codigo', ''))))
         else:
             domain.append(('document_class_id.sii_code', 'in', [39, 41] ))
+        return domain
+    
+    def _get_domain_account_invoice(self, folio, post_values):
+        domain = [('sii_document_number', '=', folio)]
+        if post_values.get('date_invoice', ''):
+            domain.append(('date_invoice','=',post_values.get('date_invoice', '')))
+        if post_values.get('amount_total', ''):
+            domain.append(('amount_total','=',post_values.get('amount_total', '')))
+        if post_values.get('sii_codigo', ''):
+            domain.append(('sii_document_class_id.sii_code', '=', int(post_values.get('sii_codigo', ''))))
+        else:
+            domain.append(('sii_document_class_id.sii_code', 'in', [39, 41] ))
+        return domain
+        
+    @http.route(['/boleta/<int:folio>'], type='http', auth="public", website=True)
+    def view_document(self, folio=None, **post):
+        if 'otra_boleta' in post:
+            return request.redirect('/boleta/%s' %(post['otra_boleta']))
+        Model = request.env['pos.order'].sudo()
+        domain = self._get_domain_pos_order(folio, post)
         orders = Model.search(domain, limit=1)
         if not orders:
             Model = request.env['account.invoice'].sudo()
-            domain = [('sii_document_number', '=', folio)]
-            if post.get('date_invoice', ''):
-                domain.append(('date_invoice','=',post.get('date_invoice', '')))
-            if post.get('amount_total', ''):
-                domain.append(('amount_total','=',post.get('amount_total', '')))
-            if post.get('sii_codigo', ''):
-                domain.append(('sii_document_class_id.sii_code','=',int(post.get('sii_codigo', ''))))
-            else:
-                domain.append(('sii_document_class_id.sii_code', 'in', [39, 41] ))
+            domain = self._get_domain_account_invoice(folio, post)
             orders = Model.search(domain, limit=1)
         values = {
             'docs': orders,

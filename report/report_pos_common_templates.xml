@@ -43,7 +43,7 @@
 			<t t-esc="o.location_id.name" />
 			<br />
 			<strong>Fecha:</strong>
-			<t t-esc="o.date_order" />
+			<span t-field="o.date_order" />
 			<br />
 			<br />
 			<t t-if="o.partner_id">
@@ -86,16 +86,16 @@
 					</td>
 					<td class="text-right">
 						<t t-if="o.state != 'cancel' and o.statement_ids">
-							<span t-field="line.price_unit" widget="monetary" />
+							<span t-esc="line.price_unit" t-options='{"widget": "monetary", "display_currency": o.company_id.currency_id}' />
 						</t>
 						<t t-if="line.discount != 0.0">
 							<span t-esc="line.discount" />
 							%
 						</t>
 					</td>
-					<td>
+					<td class="text-right">
 						<t t-if="o.state != 'cancel' and o.statement_ids">
-							<span t-field="line.price_subtotal_incl" widget="monetary" />
+							<span t-esc="line.price_subtotal_incl" t-options='{"widget": "monetary", "display_currency": o.company_id.currency_id}' />
 						</t>
 					</td>
 				</tr>
@@ -110,8 +110,8 @@
 				<table class="table table-condensed">
 					<tr t-if="o.exento() !=0">
 						<td>Exento:</td>
-						<td class="pos-right-align">
-							<t t-esc="o.exento()" />
+						<td class="text-right">
+							<t t-esc="o.exento()" t-options='{"widget": "monetary", "display_currency": o.company_id.currency_id}' />
 						</td>
 					</tr>
 					<tr>
@@ -119,7 +119,7 @@
 							<strong>MONTO TOTAL</strong>
 						</td>
 						<td class="text-right">
-							<strong t-field="o.amount_total" widget="monetary" />
+							<strong t-esc="o.amount_total" t-options='{"widget": "monetary", "display_currency": o.company_id.currency_id}' />
 						</td>
 					</tr>
 				</table>
@@ -139,9 +139,9 @@
 			<tbody>
 				<tr t-foreach="o.statement_ids" t-as="p">
 					<td>
-						<span t-esc="p.name" />
+						<span t-esc="p.journal_id.name" />
 					</td>
-					<td>
+					<td class="text-right">
 						<span t-field="p.amount" />
 					</td>
 				</tr>
