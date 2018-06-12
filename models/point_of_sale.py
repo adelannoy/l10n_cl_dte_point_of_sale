@@ -1108,7 +1108,7 @@ version="1.0">
     def print_nc(self):
         """ Print NC
         """
-        return self.env.ref('l10n_cl_dte_point_of_sale.action_print_nc').report_action(self)
+        return self.env.ref('l10n_cl_dte_point_of_sale.action_report_pos_boleta_ticket').report_action(self)
 
     @api.multi
     def _get_printed_report_name(self):
