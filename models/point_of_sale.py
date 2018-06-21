@@ -121,6 +121,18 @@ class POSL(models.Model):
             readonly=True,
         )
 
+    @api.depends('price_unit', 'tax_ids', 'qty', 'discount', 'product_id')
+    def _compute_amount_line_all(self):
+        for line in self:
+            total = 0
+            fpos = line.order_id.fiscal_position_id
+            tax_ids_after_fiscal_position = fpos.map_tax(line.tax_ids, line.product_id, line.order_id.partner_id) if fpos else line.tax_ids
+            taxes = tax_ids_after_fiscal_position.compute_all(line.price_unit, line.order_id.pricelist_id.currency_id, line.qty, product=line.product_id, partner=line.order_id.partner_id, discount=line.discount)
+            line.update({
+                'price_subtotal_incl': taxes['total_included'],
+                'price_subtotal': taxes['total_excluded'],
+            })
+
 class POS(models.Model):
     _inherit = 'pos.order'
 
