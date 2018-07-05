@@ -121,6 +121,17 @@ class POSL(models.Model):
             readonly=True,
         )
 
+    @api.depends('price_unit', 'tax_ids', 'qty', 'discount', 'product_id')
+    def _compute_amount_line_all(self):
+        for line in self:
+            fpos = line.order_id.fiscal_position_id
+            tax_ids_after_fiscal_position = fpos.map_tax(line.tax_ids, line.product_id, line.order_id.partner_id) if fpos else line.tax_ids
+            taxes = tax_ids_after_fiscal_position.compute_all(line.price_unit, line.order_id.pricelist_id.currency_id, line.qty, product=line.product_id, partner=line.order_id.partner_id, discount=line.discount)
+            line.update({
+                'price_subtotal_incl': taxes['total_included'],
+                'price_subtotal': taxes['total_excluded'],
+            })
+
 class POS(models.Model):
     _inherit = 'pos.order'
 
@@ -1100,7 +1111,7 @@ version="1.0">
     def exento(self):
         exento = 0
         for l in self.lines:
-            if l.tax_ids.amount == 0:
+            if l.tax_ids_after_fiscal_position.amount == 0:
                 exento += l.price_subtotal
         return exento if exento > 0 else (exento * -1)
 
@@ -1108,7 +1119,7 @@ version="1.0">
     def print_nc(self):
         """ Print NC
         """
-        return self.env.ref('l10n_cl_dte_point_of_sale.action_print_nc').report_action(self)
+        return self.env.ref('l10n_cl_dte_point_of_sale.action_report_pos_boleta_ticket').report_action(self)
 
     @api.multi
     def _get_printed_report_name(self):
