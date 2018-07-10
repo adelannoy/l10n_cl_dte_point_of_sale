@@ -5,8 +5,6 @@ from odoo.exceptions import UserError
 from datetime import datetime, timedelta
 import logging
 import json
-import base64
-import xmltodict
 
 _logger = logging.getLogger(__name__)
 
