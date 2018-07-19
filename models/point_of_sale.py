@@ -113,6 +113,7 @@ connection_status = {
     'Otro': 'Error Interno.',
 }
 
+
 class POSL(models.Model):
     _inherit = 'pos.order.line'
 
@@ -132,6 +133,7 @@ class POSL(models.Model):
                 'price_subtotal': taxes['total_excluded'],
             })
 
+
 class POS(models.Model):
     _inherit = 'pos.order'
 
@@ -140,6 +142,15 @@ class POS(models.Model):
         if self.sequence_id and self.sequence_id.sii_code == 61:
             ids = [61]
         return [ ('sii_document_class_id.sii_code', 'in', ids) ]
+
+    def _get_barcode_img(self):
+        for r in self:
+            if r.sii_barcode:
+                barcodefile = BytesIO()
+                image = self.pdf417bc(r.sii_barcode)
+                image.save(barcodefile, 'PNG')
+                data = barcodefile.getvalue()
+                r.sii_barcode_img = base64.b64encode(data)
 
     signature = fields.Char(
             string="Signature",
@@ -173,6 +184,7 @@ class POS(models.Model):
             copy=False,
             string=_('SII Barcode Image'),
             help='SII Barcode Image in PDF417 format',
+            compute='_get_barcode_img',
         )
     sii_xml_request = fields.Many2one(
             'sii.xml.envio',
@@ -322,43 +334,6 @@ version="1.0">
 </EnvioBOLETA>'''.format(doc)
         return xml
 
-    def get_digital_signature_pem(self, comp_id):
-        obj = user = self[0].responsable_envio if self else False
-        if not obj:
-            obj = user = self.env.user
-        if not obj.cert:
-            obj = comp_id or self.env.user.company_id
-            if not obj or not obj.cert or not user.id in obj.authorized_users_ids.ids:
-                obj = self.env['res.users'].search([("authorized_users_ids","=", user.id)])
-            if not obj.cert or not user.id in obj.authorized_users_ids.ids:
-                return False
-        signature_data = {
-            'subject_name': obj.name,
-            'subject_serial_number': obj.subject_serial_number,
-            'priv_key': obj.priv_key,
-            'cert': obj.cert,
-            'rut_envia': obj.subject_serial_number
-            }
-        return signature_data
-
-    def get_digital_signature(self, comp_id):
-        obj = user = self[0].responsable_envio if self else False
-        if not obj:
-            obj = user = self.env.user
-        if not obj.cert:
-            obj = comp_id or self.env.user.company_id
-            if not obj.cert or not user.id in obj.authorized_users_ids.ids:
-                obj = self.env['res.users'].search([("authorized_users_ids","=", user.id)])
-            if not obj or not obj.cert:
-                if not obj.cert or not user.id in obj.authorized_users_ids.ids:
-                    return False
-        signature_data = {
-            'subject_name': obj.name,
-            'subject_serial_number': obj.subject_serial_number,
-            'priv_key': obj.priv_key,
-            'cert': obj.cert}
-        return signature_data
-
     def get_resolution_data(self, comp_id):
         resolution_data = {
             'dte_resolution_date': comp_id.dte_resolution_date,
@@ -461,20 +436,41 @@ version="1.0">
 
     @api.multi
     def do_validate(self):
+        ids = []
         for order in self:
             order.sii_result = 'NoEnviado'
-            order.responsable_envio = self.env.user.id
             #if not order.invoice_id:
             order._timbrar()
+            if order.document_class_id.sii_code in [ 61 ]:
+                ids.append(order.id)
+        if ids:
+            tiempo_pasivo = (datetime.now() + timedelta(hours=int(self.env['ir.config_parameter'].sudo().get_param('account.auto_send_dte', default=12))))
+            self.env['sii.cola_envio'].create({
+                'doc_ids': ids,
+                'model': 'pos.order',
+                'user_id': self.env.uid,
+                'tipo_trabajo': 'pasivo',
+                'date_time': tiempo_pasivo,
+                'send_email': False if self[0].company_id.dte_service_provider=='SIICERT' or not self.env['ir.config_parameter'].sudo().get_param('account.auto_send_email', default=True) else True,
+            })
 
     @api.multi
     def do_dte_send_order(self):
-        invs = ids = []
+        ids = []
         for order in self:
             if not order.invoice_id:
                 if order.sii_result not in [False, '', 'NoEnviado']:
                     raise UserError("El documento %s ya ha sido enviado o está en cola de envío" % order.sii_document_number)
-                order.responsable_envio = self.env.user.id
+                if order.document_class_id.sii_code in [ 61 ]:
+                    ids.append(order.id)
+        if ids:
+            self.env['sii.cola_envio'].create({
+                'doc_ids': ids,
+                'model': 'pos.order',
+                'user_id': self.env.uid,
+                'tipo_trabajo': 'envio',
+                'send_email': False if self[0].company_id.dte_service_provider=='SIICERT' or not self.env['ir.config_parameter'].sudo().get_param('account.auto_send_email', default=True) else True,
+            })
         self.do_dte_send()
 
     def _es_boleta(self, id_doc=False):
@@ -649,7 +645,7 @@ version="1.0">
         resultcaf = self.sequence_id.get_caf_file(folio)
         result['TED']['DD']['CAF'] = resultcaf['AUTORIZACION']['CAF']
         dte = result['TED']['DD']
-        timestamp = date_order.replace(' ','T')
+        timestamp = date_order.replace(' ', 'T')
         #if date( int(timestamp[:4]), int(timestamp[5:7]), int(timestamp[8:10])) < date(int(self.date[:4]), int(self.date[5:7]), int(self.date[8:10])):
         #    raise UserError("La fecha de timbraje no puede ser menor a la fecha de emisión del documento")
         dte['TSTED'] = timestamp
@@ -674,13 +670,6 @@ version="1.0">
             _logger.warning(self.signature)
             _logger.warning("¡La firma del pos es distinta a la del Backend!")
         self.sii_barcode = ted
-        image = False
-        if ted:
-            barcodefile = BytesIO()
-            image = self.pdf417bc(ted)
-            image.save(barcodefile,'PNG')
-            data = barcodefile.getvalue()
-            self.sii_barcode_img = base64.b64encode(data)
         ted  += '<TmstFirma>{}</TmstFirma>'.format(timestamp)
         return ted
 
@@ -786,15 +775,6 @@ version="1.0">
         return xml
 
     def _timbrar(self):
-        signature_d = self.get_digital_signature(self.company_id)
-        if not signature_d:
-            raise UserError(_('''There is no Signer Person with an \
-        authorized signature for you in the system. Please make sure that \
-        'user_signature_key' module has been installed and enable a digital \
-        signature, for you or make the signer to authorize you to use his \
-        signature.'''))
-        certp = signature_d['cert'].replace(
-            BC, '').replace(EC, '').replace('\n', '')
         folio = self.get_folio()
         dte = collections.OrderedDict()
         doc_id_number = "F{}T{}".format(folio, self.document_class_id.sii_code)
@@ -820,22 +800,13 @@ version="1.0">
         clases = {}
         company_id = False
         for inv in self.with_context(lang='es_CL'):
-            signature_d = self.env.user.get_digital_signature(inv.company_id)
-            if not signature_d:
-                raise UserError(_('''There is no Signer Person with an \
-            authorized signature for you in the system. Please make sure that \
-            'user_signature_key' module has been installed and enable a digital \
-            signature, for you or make the signer to authorize you to use his \
-            signature.'''))
-            certp = signature_d['cert'].replace(
-                BC, '').replace(EC, '').replace('\n', '')
             #@TODO Mejarorar esto en lo posible
             if not inv.document_class_id.sii_code in clases:
                 clases[inv.document_class_id.sii_code] = []
             clases[inv.document_class_id.sii_code].extend([{
-                                                'id':inv.id,
+                                                'id': inv.id,
                                                 'envio': inv.sii_xml_dte,
-                                                'sii_document_number':inv.sii_document_number
+                                                'sii_document_number': inv.sii_document_number
                                             }])
             DTEs.update(clases)
             if not company_id:
@@ -881,10 +852,8 @@ version="1.0">
                 env = 'env_boleta'
             else:
                 envio_dte  = self.create_template_env(dtes)
-            envio_dte = self.env['account.invoice'].sign_full_xml(
+            envio_dte = self.env['account.invoice'].sudo(self.env.uid).sign_full_xml(
                     envio_dte,
-                    signature_d['priv_key'],
-                    certp,
                     'SetDoc',
                     env,
                 )
@@ -896,17 +865,61 @@ version="1.0">
                         'user_id': self.env.uid,
                     }
                 )
+            if env == 'env':
+                envio_id.send_xml()
             for order in self:
                 if order.document_class_id.sii_code == id_class_doc:
                     order.sii_xml_request = envio_dte.id
 
-    @api.onchange('sii_xml_request')
+    @api.onchange('sii_message')
     def get_sii_result(self):
         for r in self:
+            if r.sii_message:
+                r.sii_result = r.sii_xml_request.process_response_xml(xmltodict.parse(r.sii_message))
+                continue
             if r.sii_xml_request.state == 'NoEnviado':
                 r.sii_result = 'EnCola'
                 continue
             r.sii_result = r.sii_xml_request.state
+
+    def _get_dte_status(self):
+        for r in self:
+            if r.sii_xml_request and r.sii_xml_request.state not in ['Aceptado', 'Rechazado']:
+                continue
+            token = r.sii_xml_request.get_token(self.env.user, r.company_id)
+            url = server_url[r.company_id.dte_service_provider] + 'QueryEstDte.jws?WSDL'
+            _server = Client(url)
+            receptor = r.format_vat(r.commercial_partner_id.vat)
+            date_invoice = datetime.strptime(r.date_invoice, "%Y-%m-%d").strftime("%d-%m-%Y")
+            signature_d = self.env.user.get_digital_signature(r.company_id)
+            rut = signature_d['subject_serial_number']
+            respuesta = _server.service.getEstDte(
+                rut[:8],
+                str(rut[-1]),
+                r.company_id.vat[2:-1],
+                r.company_id.vat[-1],
+                receptor[:8],
+                receptor[-1],
+                str(r.sii_document_class_id.sii_code),
+                str(r.sii_document_number),
+                date_invoice,
+                str(int(r.amount_total)),
+                token,
+            )
+            r.sii_message = respuesta
+
+    @api.multi
+    def ask_for_dte_status(self):
+        for r in self:
+            if not r.sii_xml_request and not r.sii_xml_request.sii_send_ident:
+                raise UserError('No se ha enviado aún el documento, aún está en cola de envío interna en odoo')
+            if r.sii_xml_request.state not in [ 'Aceptado', 'Rechazado']:
+                r.sii_xml_request.get_send_status(r.env.user)
+        try:
+            self._get_dte_status()
+        except Exception as e:
+            _logger.warning("Error al obtener DTE Status: %s" %str(e))
+        self.get_sii_result()
 
     def _create_account_move_line(self, session=None, move=None):
         # Tricky, via the workflow, we only have one id in the ids variable
@@ -1071,7 +1084,7 @@ version="1.0">
                 'partner_id': partner_id
             })
 
-            order.write({'state':'done', 'account_move': move.id})
+            order.write({'state': 'done', 'account_move': move.id})
 
         all_lines = []
         for group_key, group_data in grouped_data.items():
@@ -1080,7 +1093,7 @@ version="1.0">
         if move:  # In case no order was changed
             move.sudo().write(
                     {
-                            'line_ids':all_lines,
+                            'line_ids': all_lines,
                             'document_class_id':  (document_class_id.id if document_class_id else False ),
                     }
                 )
@@ -1137,15 +1150,15 @@ class Referencias(models.Model):
     origen = fields.Char(
             string="Origin",
         )
-    sii_referencia_TpoDocRef =  fields.Many2one(
+    sii_referencia_TpoDocRef = fields.Many2one(
             'sii.document_class',
             string="SII Reference Document Type",
         )
     sii_referencia_CodRef = fields.Selection(
             [
-                    ('1','Anula Documento de Referencia'),
-                    ('2','Corrige texto Documento Referencia'),
-                    ('3','Corrige montos')
+                    ('1', 'Anula Documento de Referencia'),
+                    ('2', 'Corrige texto Documento Referencia'),
+                    ('3', 'Corrige montos')
             ],
             string="SII Reference Code",
         )
