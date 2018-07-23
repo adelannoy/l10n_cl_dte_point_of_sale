@@ -1144,6 +1144,7 @@ version="1.0">
     def get_invoice(self):
         return self.invoice_id
 
+
 class Referencias(models.Model):
     _name = 'pos.order.referencias'
 
