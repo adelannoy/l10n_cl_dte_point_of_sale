@@ -398,12 +398,12 @@ version="1.0">
         order_id.sequence_number = order['sequence_number'] #FIX odoo bug
         if order.get('orden_numero', False) and order.get('sequence_id', False):
             order_id.sequence_id = order['sequence_id'].get('id', False)
-            if order_id.sequence_id and  order_id.sequence_id.sii_document_class_id.sii_code == 39 and  order['orden_numero'] > order_id.session_id.numero_ordenes:
+            if order_id.sequence_id and order_id.sequence_id.sii_document_class_id.sii_code == 39 and  order['orden_numero'] > order_id.session_id.numero_ordenes:
                 order_id.session_id.numero_ordenes = order['orden_numero']
             elif order_id.sequence_id and order_id.sequence_id.sii_document_class_id.sii_code == 41 and order['orden_numero'] > order_id.session_id.numero_ordenes_exentas:
                 order_id.session_id.numero_ordenes_exentas = order['orden_numero']
             order_id.sii_document_number = order['sii_document_number']
-            sign = self.get_digital_signature(self.env.user.company_id)
+            sign = self.env.user.get_digital_signature(self.env.user.company_id)
             if (order_id.session_id.caf_files or order_id.session_id.caf_files_exentas) and sign:
                 order_id.signature = order['signature']
                 order_id._timbrar()
