@@ -30,5 +30,5 @@ class POSBoleta(Boleta):
 
     def _get_report(self, document):
         if document._name == 'pos.order':
-            return request.env.ref('l10n_cl_fe.action_report_pos_boleta_ticket').sudo().render_qweb_pdf([document.id])[0]
+            return request.env.ref('l10n_cl_dte_point_of_sale.action_report_pos_boleta_ticket').sudo().render_qweb_pdf([document.id])[0]
         return super(POSBoleta, self)._get_report(document)
