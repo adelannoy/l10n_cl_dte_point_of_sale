@@ -344,7 +344,7 @@ version="1.0">
     def get_xml_file(self):
         return {
             'type' : 'ir.actions.act_url',
-            'url': '/download/xml/boleta/%s' % (self.id ),
+            'url': '/download/xml/boleta/%s' % (self.id),
             'target': 'self',
         }
 
@@ -359,7 +359,7 @@ version="1.0">
             value ="CL666666666"
             #@TODO opción de crear código de cliente en vez de rut genérico
         rut = value[:10] + '-' + value[10:]
-        rut = rut.replace('CL0','').replace('CL','')
+        rut = rut.replace('CL0', '').replace('CL', '')
         return rut
 
     def pdf417bc(self, ted):
@@ -394,7 +394,7 @@ version="1.0">
             l[2]['pos_order_line_id'] = int(l[2]['id'])
             lines.append(l)
         order['lines'] = lines
-        order_id = super(POS,self)._process_order(order)
+        order_id = super(POS, self)._process_order(order)
         order_id.sequence_number = order['sequence_number'] #FIX odoo bug
         if order.get('orden_numero', False) and order.get('sequence_id', False):
             order_id.sequence_id = order['sequence_id'].get('id', False)
@@ -414,18 +414,13 @@ version="1.0">
         result = super(POS, self)._prepare_invoice()
         journal_document_class_id = self.env['account.journal.sii_document_class'].search(
                 [
-                    ('journal_id','=', self.sale_journal.id),
-                    ('sii_document_class_id.sii_code', 'in', [ 33 ]),
+                    ('journal_id', '=', self.sale_journal.id),
+                    ('sii_document_class_id.sii_code', 'in', [33]),
                 ],
             )
         if not journal_document_class_id:
             raise UserError("Por favor defina Secuencia de Facturas para el Journal del POS")
-        available_turn_ids = self.company_id.company_activities_ids
-        turn_issuer = False
-        for turn in available_turn_ids:
-            turn_issuer = turn
         result.update({
-            'turn_issuer' : turn_issuer.id,
             'activity_description': self.partner_id.activity_description.id,
             'ticket':  self.session_id.config_id.ticket,
             'sii_document_class_id': journal_document_class_id.sii_document_class_id.id,
@@ -441,7 +436,7 @@ version="1.0">
             order.sii_result = 'NoEnviado'
             #if not order.invoice_id:
             order._timbrar()
-            if order.document_class_id.sii_code in [ 61 ]:
+            if order.document_class_id.sii_code in [61]:
                 ids.append(order.id)
         if ids:
             tiempo_pasivo = (datetime.now() + timedelta(hours=int(self.env['ir.config_parameter'].sudo().get_param('account.auto_send_dte', default=12))))
@@ -495,7 +490,7 @@ version="1.0">
         from_zone = pytz.UTC
         to_zone = pytz.timezone('America/Santiago')
         date_order = util_model._change_time_zone(datetime.strptime(self.date_order, DTF), from_zone, to_zone).strftime(DTF)
-        IdDoc= collections.OrderedDict()
+        IdDoc = collections.OrderedDict()
         IdDoc['TipoDTE'] = self.document_class_id.sii_code
         IdDoc['Folio'] = self.get_folio()
         IdDoc['FchEmis'] = date_order[:10]
@@ -509,7 +504,7 @@ version="1.0">
         #    Encabezado['IdDoc']['IndServicio'] = 1,2,3,4
         # todo: forma de pago y fecha de vencimiento - opcional
         if not taxInclude:
-        	IdDoc['IndMntNeto'] = 2
+            IdDoc['IndMntNeto'] = 2
         #if self._es_boleta():
             #Servicios periódicos
         #    IdDoc['PeriodoDesde'] =
@@ -517,7 +512,7 @@ version="1.0">
         return IdDoc
 
     def _emisor(self):
-        Emisor= collections.OrderedDict()
+        Emisor = collections.OrderedDict()
         Emisor['RUTEmisor'] = self.format_vat(self.company_id.vat)
         if self._es_boleta():
             Emisor['RznSocEmisor'] = self.company_id.partner_id.name
@@ -562,10 +557,10 @@ version="1.0">
             if self.amount_tax > 0:
                 raise UserError("NO pueden ir productos afectos en documentos exentos")
             Totales['MntExe'] = amount_total
-            if  no_product:
+            if no_product:
                 Totales['MntExe'] = 0
         elif not no_product:
-            amount_untaxed =  self.amount_total - self.amount_tax
+            amount_untaxed = self.amount_total - self.amount_tax
             if amount_untaxed < 0:
                 amount_untaxed *= -1
             if MntExe < 0:
@@ -583,7 +578,7 @@ version="1.0">
                 if IVA :
                     Totales['MntNeto'] = int(round((Neto), 0))
             if MntExe > 0:
-                Totales['MntExe'] = int(round( MntExe))
+                Totales['MntExe'] = int(round(MntExe))
             if not taxInclude and not self._es_boleta():
                 if IVA:
                     if not self._es_boleta():
@@ -740,13 +735,13 @@ version="1.0">
         dte['Encabezado'] = self._encabezado(invoice_lines['MntExe'], invoice_lines['no_product'], invoice_lines['tax_include'])
         lin_ref = 1
         ref_lines = []
-        if 'referencias' in self and  self.referencias :
+        if 'referencias' in self and self.referencias :
             for ref in self.referencias:
                 ref_line = {}
                 ref_line = collections.OrderedDict()
                 ref_line['NroLinRef'] = lin_ref
                 if not self._es_boleta():
-                    if  ref.sii_referencia_TpoDocRef:
+                    if ref.sii_referencia_TpoDocRef:
                         ref_line['TpoDocRef'] = ref.sii_referencia_TpoDocRef.sii_code
                         ref_line['FolioRef'] = ref.origen
                     ref_line['FchRef'] = ref.fecha_documento or datetime.strftime(datetime.now(), '%Y-%m-%d')
