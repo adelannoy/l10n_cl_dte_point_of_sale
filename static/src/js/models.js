@@ -19,7 +19,7 @@ for(var i=0; i<modules.length; i++){
 		model.fields.push('document_number','activity_description','document_type_id', 'state_id', 'city_id', 'dte_email');
 	}
 	if(model.model === 'pos.session'){
-		model.fields.push('caf_files', 'caf_files_exentas', 'start_number', 'start_number_exentas', 'numero_ordenes', 'numero_ordenes_exentas');
+		model.fields.push('caf_files', 'caf_files_exentas', 'caf_files_boleta_manual', 'start_number', 'start_number_boleta_manual', 'start_number_exentas', 'numero_ordenes', 'numero_ordenes_boleta_manual','numero_ordenes_exentas');
 	}
 	if (model.model == 'product.product') {
 		model.fields.push('name');
@@ -52,6 +52,17 @@ models.load_models({
 models.load_models({
 	model: 'ir.sequence',
 	fields: ['id', 'sii_document_class_id'],
+	domain: function(self){ return [['id', '=', self.config.secuencia_boleta_manual[0]]]; },
+		loaded: function(self, doc){
+			if(doc.length > 0){
+				self.config.secuencia_boleta_manual = doc[0];
+			}
+		}
+});
+
+models.load_models({
+	model: 'ir.sequence',
+	fields: ['id', 'sii_document_class_id'],
 	domain: function(self){ return [['id', '=', self.config.secuencia_boleta_exenta[0]]]; },
 		loaded: function(self, doc){
 			if (doc.length > 0){
@@ -68,6 +79,19 @@ models.load_models({
 			if(doc.length > 0){
 				self.config.secuencia_boleta.sii_document_class_id = doc[0];
 				self.config.secuencia_boleta.caf_files = self.pos_session.caf_files;
+			}
+		}
+});
+
+
+models.load_models({
+	model: 'sii.document_class',
+	fields: ['id', 'name', 'sii_code'],
+	domain: function(self){ return [['id', '=', (self.config.secuencia_boleta_manual ? self.config.secuencia_boleta_manual.sii_document_class_id[0]: false)]]; },
+		loaded: function(self, doc){
+			if(doc.length > 0){
+				self.config.secuencia_boleta_manual.sii_document_class_id = doc[0];
+				self.config.secuencia_boleta_manual.caf_files = self.pos_session.caf_files_boleta_manual;
 			}
 		}
 });
@@ -136,7 +160,12 @@ models.PosModel = models.PosModel.extend({
 	folios_boleta_afecta: function(){
 		return this.pos_session.caf_files;
 	},
+	folios_boleta_manual: function(){
+		return this.pos_session.caf_files_boleta_manual;
+	},
 	get_next_number: function(sii_document_number, caf_files, start_number){
+		console.log("Dentro de get_next_number models.js");
+		console.log(sii_document_number, caf_files, start_number);
 		var start_caf_file = false;
 		for (var x in caf_files){
 			if(parseInt(caf_files[x].AUTORIZACION.CAF.DA.RNG.D) <= parseInt(start_number)
@@ -164,20 +193,38 @@ models.PosModel = models.PosModel.extend({
 			return sii_document_number;
 		}
 		if(sii_document_number < parseInt(caf_file.AUTORIZACION.CAF.DA.RNG.D)){
-			var dif = orden_numero - ((parseInt(start_caf_file.AUTORIZACION.CAF.DA.RNG.H) - start_number) + 1 + gived);
+			console.log(sii_document_number);
+			console.log(caf_file.AUTORIZACION.CAF.DA.RNG.D);
+			var dif = this.orden_numero - ((parseInt(start_caf_file.AUTORIZACION.CAF.DA.RNG.H) - start_number) + 1 + gived);
 			sii_document_number = parseInt(caf_file.AUTORIZACION.CAF.DA.RNG.D) + dif;
 			if (sii_document_number >  parseInt(caf_file.AUTORIZACION.CAF.DA.RNG.H)){
 				sii_document_number = get_next_number(sii_document_number);
 			}
 		}
+		console.log(sii_document_number);
+		console.log("Antes de salir de get_next_number");
 		return sii_document_number;
 	},
 	push_order: function(order, opts) {
 		if(order && order.es_boleta() && !this.finalized){
 			var orden_numero = order.orden_numero -1;
 			var caf_files = JSON.parse(order.sequence_id.caf_files);
-			var start_number = order.sequence_id.sii_document_class_id.sii_code == 41 ? this.pos_session.start_number_exentas : this.pos_session.start_number;
 
+			var start_number= 0;
+			switch(order.sequence_id.sii_document_class_id.sii_code) {
+				case 41: 
+						 start_number = this.pos_session.start_number_exentas;
+						 break;
+				case 35: 
+						 start_number = this.pos_session.start_number_boleta_manual;
+						 break;
+				case 39: 
+						 start_number = this.pos_session.start_number;
+						 break;
+				default:
+				         start_number = "Error";
+			}
+			
 			var sii_document_number = this.get_next_number(parseInt(orden_numero) + parseInt(start_number), caf_files, start_number);
 
 			order.sii_document_number = sii_document_number;
@@ -198,6 +245,9 @@ models.Order = models.Order.extend({
 		if (this.pos.config.marcar === 'boleta' && this.pos.config.secuencia_boleta){
 			this.set_boleta(true);
 			this.set_tipo_boleta(this.pos.config.secuencia_boleta);
+		}else if (this.pos.config.marcar === 'boleta_manual' && this.pos.config.secuencia_boleta_manual){
+			this.set_boleta(true);
+			this.set_tipo_boleta(this.pos.config.secuencia_boleta_manual);
 		}else if (this.pos.config.marcar === 'boleta_exenta' && this.pos.config.secuencia_boleta_exenta){
 			this.set_boleta(true);
 			this.set_tipo_boleta(this.pos.config.secuencia_boleta_exenta);
@@ -229,7 +279,7 @@ models.Order = models.Order.extend({
     	this.signature = json.signature;
     	this.orden_numero = json.orden_numero;
 			this.finalized = json.finalized;
-			console.log(json);
+			console.log(json,this.sii_document_number);
 	},
 	export_for_printing: function() {
 		var json = _super_order.export_for_printing.apply(this,arguments);
@@ -268,7 +318,11 @@ models.Order = models.Order.extend({
 			if(this.es_boleta_exenta()){
 				this.pos.pos_session.numero_ordenes_exentas ++;
 				this.orden_numero = this.pos.pos_session.numero_ordenes_exentas;
-			}else{
+			}else if(this.es_boleta_afecta_manual()){
+				this.pos.pos_session.numero_ordenes_boleta_manual ++;
+				this.orden_numero = this.pos.pos_session.numero_ordenes_boleta_manual;
+			}
+			else{
 				this.pos.pos_session.numero_ordenes ++;
 				this.orden_numero = this.pos.pos_session.numero_ordenes;
 			}
@@ -316,6 +370,20 @@ models.Order = models.Order.extend({
 		if (this.sequence_id.sii_document_class_id.sii_code === 39){
 			return true;
 		}
+		return false;
+	},
+	es_boleta_afecta_manual: function(check_marcar=false){
+		console.log("Dentro de es_boleta_afecta_manual");
+		if(!this.es_boleta()){
+			return false;
+		}
+		
+		console.log(this.sequence_id.sii_document_class_id.sii_code);
+
+		if (this.sequence_id.sii_document_class_id.sii_code === 35){
+			return true;
+		}
+		console.log("Dentro de es_boleta_afecta_manual.  NO ES MANUAL");
 		return false;
 	},
     get_total_exento:function(){

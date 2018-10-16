@@ -15,12 +15,19 @@ class PosSession(models.Model):
             'ir.sequence',
             string='Documents Type',
         )
+    secuencia_boleta_manual = fields.Many2one(
+            'ir.sequence',
+            string='Documents Type',
+        )
     secuencia_boleta_exenta = fields.Many2one(
             'ir.sequence',
             string='Documents Type',
         )
     start_number = fields.Integer(
             string='Folio Inicio',
+        )
+    start_number_boleta_manual = fields.Integer(
+            string='Folio Inicio Boleta Manual',
         )
     start_number_exentas = fields.Integer(
             string='Folio Inicio Exentas',
@@ -29,11 +36,18 @@ class PosSession(models.Model):
             string="Número de órdenes",
             default=0,
         )
+    numero_ordenes_boleta_manual = fields.Integer(
+            string="Número de órdenes Boleta Manual",
+            default=0,
+        )
     numero_ordenes_exentas = fields.Integer(
             string="Número de órdenes exentas",
             default=0,
         )
     caf_files = fields.Char(
+            invisible=True,
+        )
+    caf_files_boleta_manual = fields.Char(
             invisible=True,
         )
     caf_files_exentas = fields.Char(
@@ -44,23 +58,39 @@ class PosSession(models.Model):
     def create(self, values):
         pos_config = values.get('config_id') or self.env.context.get('default_config_id')
         config_id = self.env['pos.config'].browse(pos_config)
+        _logger.info("pos_session CREANDO POS_SESSION!!!")
         if not config_id:
             raise UserError(_("You should assign a Point of Sale to your session."))
         if config_id.secuencia_boleta:
             sequence = config_id.secuencia_boleta
+            _logger.info("pos_session secuence para Boleta Electronica:")
+            _logger.info(sequence)
             start_number = sequence.number_next_actual
             sequence.update_next_by_caf()
             start_number = start_number if sequence.number_next_actual == start_number else sequence.number_next_actual
+            _logger.info("start_number Boleta Afecta Electronica: "+str(start_number))
             values.update({
                 'start_number': start_number,
                 'secuencia_boleta': config_id.secuencia_boleta.id,
                 'caf_files': self.get_caf_string(sequence),
+            })
+        if config_id.secuencia_boleta_manual:
+            sequence = config_id.secuencia_boleta_manual
+            start_number = sequence.number_next_actual
+            sequence.update_next_by_caf()
+            start_number = start_number if sequence.number_next_actual == start_number else sequence.number_next_actual
+            _logger.info("start_number Boleta Afecta Manual: "+str(start_number))
+            values.update({
+                'start_number_boleta_manual': start_number,
+                'secuencia_boleta_manual': config_id.secuencia_boleta_manual.id,
+                'caf_files_boleta_manual': self.get_caf_string(sequence),
             })
         if config_id.secuencia_boleta_exenta:
             sequence = config_id.secuencia_boleta_exenta
             start_number = sequence.number_next_actual
             sequence.update_next_by_caf()
             start_number = start_number if sequence.number_next_actual == start_number else sequence.number_next_actual
+            _logger.info("start_number Boleta Exenta Electrónica: "+str(start_number))
             values.update({
                 'start_number_exentas': start_number,
                 'secuencia_boleta_exenta': config_id.secuencia_boleta_exenta.id,

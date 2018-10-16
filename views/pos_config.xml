@@ -19,6 +19,11 @@
                                      domain="[('sii_document_class_id.sii_code', 'in', [39])]" />
                           </div>
                           <div class="row mt16">
+                              <label string="Secuencias de Boleta Manual" for="secuencia_boleta_manual" class="col-md-3 o_light_label"/>
+                              <field name="secuencia_boleta_manual"
+                                     domain="[('sii_document_class_id.sii_code', 'in', [35])]" />
+                          </div>
+                          <div class="row mt16">
                             <label string="Secuencias de Boleta Exenta" for="secuencia_boleta_exenta" class="col-md-3 o_light_label"/>
                             <field name="secuencia_boleta_exenta"
                                       domain="[('sii_document_class_id.sii_code', 'in', [41])]" />
@@ -45,6 +50,8 @@
           <field name="pos_session_state" position="after">
             <field name="next_number" />
             <field name="left_number" />
+            <field name="next_number_boleta_manual" />
+            <field name="left_number_boleta_manual" />
             <field name="next_number_exenta" />
             <field name="left_number_exenta" />
           </field>
@@ -62,6 +69,21 @@
               </div>
               <div class="col-xs-6">
                   <span><field name="left_number"/></span>
+              </div>
+            </div>
+            <div t-if="record.next_number_boleta_manual.value > 0" class="row">
+              <h3>Boletas Manuales Afectas</h3>
+              <div class="col-xs-6">
+                  <span>Próximo Folio</span>
+              </div>
+              <div class="col-xs-6">
+                  <span><field name="next_number_boleta_manual"/></span>
+              </div>
+              <div class="col-xs-6">
+                  <span>Folios Restantes</span>
+              </div>
+              <div class="col-xs-6">
+                  <span><field name="left_number_boleta_manual"/></span>
               </div>
             </div>
             <div t-if="record.next_number_exenta.value > 0" class="row">

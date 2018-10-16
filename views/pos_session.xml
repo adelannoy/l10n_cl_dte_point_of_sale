@@ -11,8 +11,15 @@
                        options="{'no_create': True}"/>
                 <field name="start_number" />
                 <field name="caf_files" invisible="True" readonly="True" />
+                <field name="caf_files_boleta_manual" invisible="True" readonly="True" />
                 <field name="caf_files_exentas" invisible="True" readonly="True" />
                 <field name="numero_ordenes" readonly="True"/>
+              </group>
+              <group string="Boletas Manual Afectas">
+                <field name="secuencia_boleta_manual"
+                       options="{'no_create': True}"/>
+                <field name="start_number_boleta_manual" />
+                <field name="numero_ordenes_boleta_manual" readonly="True"/>
               </group>
               <group string="Boletas Exentas" attrs="{'invisible':[('secuencia_boleta_exenta','=', False)]}">
                 <field name="secuencia_boleta_exenta"

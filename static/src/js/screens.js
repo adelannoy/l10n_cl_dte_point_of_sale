@@ -14,14 +14,19 @@ screens.PaymentScreenWidget.include({
 		this.$('.js_boleta').click(function(){
 			self.click_boleta();
 		});
+		this.$('.js_boleta_manual').click(function(){
+			self.click_boleta_manual();
+		});
 		this.$('.js_boleta_exenta').click(function(){
 			self.click_boleta_exenta();
 		});
 	},
 	order_is_valid: function(force_validation) {
+		console.log("En order_is_valid");
 		var self = this;
 		var res = this._super(force_validation);
 		var order = self.pos.get_order();
+		console.log("En order_is_valid, antes del primer if. Order:",order);
 		if (order.is_to_invoice() || order.es_boleta()){
 		      var total_tax = order.get_total_tax();
 		      if (order.es_boleta_exenta() && total_tax > 0){// @TODO agrregar facturas exentas
@@ -69,18 +74,31 @@ screens.PaymentScreenWidget.include({
 			});
 			return false;
 		}
+		console.log("En order_is_valid, antes revisar caf_files");
 		if (res && !order.is_to_invoice() && order.es_boleta()){
 			var start_number = 0;
 			var numero_ordenes = 0;
 			if (order.es_boleta_afecta()){
+				console.log("SOY BOLETA AFECTA ELECTRONICA");
 				start_number = self.pos.pos_session.start_number;
 				numero_ordenes = self.pos.pos_session.numero_ordenes;
+				console.log("start_number:"+start_number+"  numero_ordenes:" + numero_ordenes);
 			} else if (order.es_boleta_exenta()){
+				console.log("SOY BOLETA EXENTA ELECTRONICA");
 				start_number = self.pos.pos_session.start_number_exentas;
 				numero_ordenes = self.pos.pos_session.numero_ordenes_exentas;
+			} else if (order.es_boleta_afecta_manual()){
+				console.log("SOY BOLETA MANUAL AFECTA");
+				start_number = self.pos.pos_session.start_number_boleta_manual;
+				numero_ordenes = self.pos.pos_session.numero_ordenes_boleta_manual;
 			}
+			
 			var caf_files = JSON.parse(order.sequence_id.caf_files);
-			var next_number = start_number + numero_ordenes;
+			var next_number = start_number + numero_ordenes;	
+			console.log("---- antes de llamar a get_next_number  ");
+			console.log(next_number, caf_files, start_number);
+			console.log("------------------------------------------  ");
+
 			next_number = self.pos.get_next_number(next_number, caf_files, start_number);
 			var caf_file = false;
 			for (var x in caf_files){
@@ -105,12 +123,14 @@ screens.PaymentScreenWidget.include({
 	unset_boleta:function(order){
 		order.unset_boleta();
 		this.$('.js_boleta').removeClass('highlight');
+		this.$('.js_boleta_manual').removeClass('highlight');
 		this.$('.js_boleta_exenta').removeClass('highlight');
 	},
 	click_boleta: function(){
 		var order = this.pos.get_order();
 		order.set_to_invoice(false);
 		this.$('.js_invoice').removeClass('highlight');
+		console.log(this.pos.config.secuencia_boleta);
 		if (this.pos.pos_session.caf_files && (order.es_boleta_exenta() || !order.es_boleta())) {
 			this.unset_boleta(order);
 			order.set_boleta(true);
@@ -120,10 +140,28 @@ screens.PaymentScreenWidget.include({
 		}
 		this.unset_boleta(order);
 	},
+	click_boleta_manual: function(){
+		var order = this.pos.get_order();
+		order.set_to_invoice(false);
+		this.$('.js_invoice').removeClass('highlight');
+		console.log("Secuencia boleta manual:");
+		console.log(this.pos.config.secuencia_boleta_manual);
+		console.log(this.pos.pos_session.caf_files_boleta_manual);
+		if (this.pos.pos_session.caf_files_boleta_manual ) {
+			this.unset_boleta(order);
+			order.set_boleta(true);
+			console.log("Secuencia boleta manual con CAF:"+this.pos.config.secuencia_boleta_manual);
+			order.set_tipo_boleta(this.pos.config.secuencia_boleta_manual);
+			this.$('.js_boleta_manual').addClass('highlight');
+			return;
+		}
+		this.unset_boleta(order);
+	},
 	click_boleta_exenta: function(){
 		var order = this.pos.get_order();
 		order.set_to_invoice(false);
 		this.$('.js_invoice').removeClass('highlight');
+		console.log(this.pos.config.secuencia_boleta_exenta);
 		if (this.pos.pos_session.caf_files_exentas && !order.es_boleta_exenta()){
 			this.unset_boleta(order);
 			order.set_boleta(true);

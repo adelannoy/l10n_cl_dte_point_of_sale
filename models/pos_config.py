@@ -12,6 +12,9 @@ class PosConfig(models.Model):
         for rec in self:
             if rec.secuencia_boleta:
                 rec.left_number = rec.secuencia_boleta.get_qty_available()
+            if rec.secuencia_boleta_manual:
+                rec.left_number_boleta_manual = rec.secuencia_boleta_manual.get_qty_available()
+                _logger.debug("rec.left_number_boleta_manual: %s", rec.left_number_boleta_manual)
             if rec.secuencia_boleta_exenta:
                 rec.left_number_exenta = rec.secuencia_boleta_exenta.get_qty_available()
 
@@ -23,6 +26,10 @@ class PosConfig(models.Model):
             'ir.sequence',
             string='Secuencia Boleta Exenta',
         )
+    secuencia_boleta_manual = fields.Many2one(
+            'ir.sequence',
+            string='Secuencia Boleta Manual',
+        )
     ticket = fields.Boolean(
             string="¿Facturas en Formato Ticket?",
             default=False,
@@ -31,6 +38,10 @@ class PosConfig(models.Model):
             related="secuencia_boleta.number_next_actual",
             string="Next Number",
         )
+    next_number_boleta_manual = fields.Integer(
+            related="secuencia_boleta_manual.number_next_actual",
+            string="Next Number Boleta Manual",
+        )
     next_number_exenta = fields.Integer(
             related="secuencia_boleta_exenta.number_next_actual",
             string="Next Number Exenta",
@@ -38,6 +49,10 @@ class PosConfig(models.Model):
     left_number = fields.Integer(
             compute="get_left_numbers",
             string="Folios restantes Boletas",
+        )
+    left_number_boleta_manual = fields.Integer(
+            compute="get_left_numbers",
+            string="Folios restantes Boletas Manuales",
         )
     left_number_exenta = fields.Integer(
             compute="get_left_numbers",
@@ -48,16 +63,21 @@ class PosConfig(models.Model):
             ('boleta', 'Boletas'),
             ('factura', 'Facturas'),
             ('boleta_exenta', 'Boletas Exentas'),
+            ('boleta_manual', 'Boletas Manuales')
         ],
         string="Marcar por defecto",
     )
 
     @api.one
-    @api.constrains('marcar','secuencia_boleta', 'secuencia_boleta_exenta', 'iface_invoicing')
+    @api.constrains('marcar','secuencia_boleta', 'secuencia_boleta_manual', 'secuencia_boleta_exenta', 'iface_invoicing')
     def _check_document_type(self):
         if self.marcar == 'boleta' and not self.secuencia_boleta:
             raise ValidationError("Al marcar por defecto Boletas, "
                                   "debe seleccionar la Secuencia de Boletas, "
+                                  "por favor verifique su configuracion")
+        elif self.marcar == 'boleta_manual' and not self.secuencia_boleta_manual:
+            raise ValidationError("Al marcar por defecto Boletas Manuales, "
+                                  "debe seleccionar la Secuencia de Boletas Manuales, "
                                   "por favor verifique su configuracion")
         elif self.marcar == 'boleta_exenta' and not self.secuencia_boleta_exenta:
             raise ValidationError("Al marcar por defecto Boletas Exentas, "
