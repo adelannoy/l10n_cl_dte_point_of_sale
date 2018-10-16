@@ -107,9 +107,14 @@
 					t-att-value='partner.dte_email || ""'></input>
 			</div>
 		</t>
+<<<<<<< HEAD
 		<t t-jquery="span:contains('Tax ID')" t-operation="replace">
 			<span class='label'>VAT</span>
 		</t>
+=======
+		<t t-jquery="input[name='vat']" t-operation="replace" />
+		<t t-jquery="span:contains('Tax ID')" t-operation="replace" />
+>>>>>>> 1b2afd88088447aab053e068fe9b8deefcfaffab
 	</t>
 
 	<t t-extend="ClientDetails">
@@ -141,9 +146,15 @@
 				</t>
 			</div>
 		</t>
+<<<<<<< HEAD
 		<t t-jquery="span:contains('Tax ID')" t-operation="replace">
 			<span class='label'>VAT</span>
 		</t>
+=======
+		<t t-jquery="span:contains('Tax ID')" t-operation="replace" />
+		<t t-jquery="t[t-if='partner.vat']" t-operation="replace" />
+		<t t-jquery="t[t-if='!partner.vat']" t-operation="replace" />
+>>>>>>> 1b2afd88088447aab053e068fe9b8deefcfaffab
 	</t>
 
 	<t t-extend="ClientListScreenWidget">
